@@ -543,6 +543,7 @@
                         <button class="operation-type-btn long active" id="btnLong" onclick="setOperationType('long')">📈 LONG (Compra)</button>
                         <button class="operation-type-btn short" id="btnShort" onclick="setOperationType('short')">📉 SHORT (Venda)</button>
                     </div>
+                    <input type="hidden" id="operationType" value="LONG (Compra)">
                 </div>
 
                 <button class="btn-calculate" onclick="calculate()">🧮 Calcular Posição</button>
@@ -643,16 +644,254 @@
         let drawdownChart = null;
         let currentCapital = 100000;
         let currentRiskPerTrade = 2000;
+        let selectedPair = null;
+        let binancePairs = [];
 
         function formatCurrency(value) {
-            return new Intl.NumberFormat('pt-BR', {
+            return new Intl.NumberFormat('en-US', {
                 style: 'currency',
-                currency: 'BRL'
+                currency: 'USD',
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 6
             }).format(value);
         }
 
+        // Carregar pares da Binance usando API oficial
+        async function loadBinancePairs() {
+            const pairSelector = document.getElementById('pairSelector');
+            pairSelector.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 20px;"><span class="loading"></span> Carregando pares da Binance...</div>';
+            
+            try {
+                // Buscar todos os pares de negociação da Binance
+                const response = await fetch('https://api.binance.com/api/v3/exchangeInfo');
+                if (!response.ok) {
+                    throw new Error('Erro na resposta da API');
+                }
+                const data = await response.json();
+                
+                // Filtrar apenas pares USDT com status TRADING
+                binancePairs = data.symbols
+                    .filter(symbol => 
+                        symbol.quoteAsset === 'USDT' && 
+                        symbol.status === 'TRADING' &&
+                        symbol.symbol.endsWith('USDT')
+                    )
+                    .sort((a, b) => a.symbol.localeCompare(b.symbol));
+                
+                if (binancePairs.length === 0) {
+                    pairSelector.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 20px; color: #e74c3c;">Nenhum par encontrado</div>';
+                    return;
+                }
+                
+                // Renderizar botões dos pares (limitar aos primeiros 100 para performance)
+                renderPairs(binancePairs.slice(0, 100));
+                
+                // Buscar preços dos pares
+                await loadPrices();
+                
+            } catch (error) {
+                console.error('Erro ao carregar pares:', error);
+                pairSelector.innerHTML = `<div style="grid-column: 1/-1; text-align: center; padding: 20px; color: #e74c3c;">
+                    <p>❌ Erro ao carregar pares da Binance</p>
+                    <p style="font-size: 0.9em; margin-top: 10px;">${error.message}</p>
+                    <button onclick="loadBinancePairs()" style="margin-top: 10px; padding: 8px 16px; background: #f7931a; color: white; border: none; border-radius: 5px; cursor: pointer;">🔄 Tentar Novamente</button>
+                </div>`;
+            }
+        }
+
+        // Renderizar botões dos pares
+        function renderPairs(pairs) {
+            const pairSelector = document.getElementById('pairSelector');
+            pairSelector.innerHTML = '';
+            
+            pairs.forEach(pair => {
+                const btn = document.createElement('button');
+                btn.className = 'pair-btn';
+                btn.textContent = pair.symbol.replace('USDT', '');
+                btn.dataset.symbol = pair.symbol;
+                btn.onclick = () => selectPair(pair.symbol);
+                pairSelector.appendChild(btn);
+            });
+            
+            // Adicionar mensagem se houver mais pares
+            if (pairs.length < binancePairs.length) {
+                const moreMsg = document.createElement('div');
+                moreMsg.style.gridColumn = '1/-1';
+                moreMsg.style.textAlign = 'center';
+                moreMsg.style.fontSize = '0.85em';
+                moreMsg.style.color = '#7f8c8d';
+                moreMsg.style.padding = '10px';
+                moreMsg.textContent = `Mostrando ${pairs.length} de ${binancePairs.length} pares. Use a busca abaixo.`;
+                pairSelector.appendChild(moreMsg);
+            }
+        }
+
+        // Carregar preços dos pares
+        async function loadPrices() {
+            try {
+                const response = await fetch('https://api.binance.com/api/v3/ticker/price');
+                if (!response.ok) {
+                    throw new Error('Erro ao buscar preços');
+                }
+                const prices = await response.json();
+                
+                // Criar mapa de preços
+                const priceMap = {};
+                prices.forEach(ticker => {
+                    if (ticker.symbol.endsWith('USDT')) {
+                        priceMap[ticker.symbol] = parseFloat(ticker.price);
+                    }
+                });
+                
+                // Atualizar botões com preços
+                document.querySelectorAll('.pair-btn').forEach(btn => {
+                    const symbol = btn.dataset.symbol;
+                    const price = priceMap[symbol];
+                    if (price !== undefined) {
+                        const baseAsset = symbol.replace('USDT', '');
+                        if (price < 1) {
+                            btn.innerHTML = `${baseAsset}<br><small>$${price.toFixed(6)}</small>`;
+                        } else if (price < 100) {
+                            btn.innerHTML = `${baseAsset}<br><small>$${price.toFixed(4)}</small>`;
+                        } else {
+                            btn.innerHTML = `${baseAsset}<br><small>$${price.toFixed(2)}</small>`;
+                        }
+                    }
+                });
+                
+            } catch (error) {
+                console.error('Erro ao carregar preços:', error);
+            }
+        }
+
+        // Selecionar um par
+        function selectPair(symbol) {
+            selectedPair = symbol;
+            
+            // Atualizar visual dos botões
+            document.querySelectorAll('.pair-btn').forEach(btn => {
+                btn.classList.remove('active');
+                if (btn.dataset.symbol === symbol) {
+                    btn.classList.add('active');
+                }
+            });
+            
+            // Buscar preço atual do par selecionado
+            fetchCurrentPrice(symbol);
+        }
+
+        // Buscar preço atual do par selecionado
+        async function fetchCurrentPrice(symbol) {
+            try {
+                const response = await fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${symbol}`);
+                if (!response.ok) {
+                    throw new Error('Erro ao buscar preço');
+                }
+                const data = await response.json();
+                const price = parseFloat(data.price);
+                
+                // Atualizar display de preço
+                const priceDisplay = document.getElementById('currentPriceDisplay');
+                const priceValue = document.getElementById('currentPriceValue');
+                
+                priceDisplay.classList.remove('hidden');
+                priceValue.textContent = formatCurrency(price);
+                
+                // Preencher automaticamente o preço de entrada
+                document.getElementById('entryPrice').value = price;
+                
+                // Calcular stop loss automaticamente baseado no R:R selecionado
+                const activeRR = document.querySelector('.rr-btn.active');
+                if (activeRR) {
+                    const rrRatio = parseInt(activeRR.textContent.split(':')[1]);
+                    setStopLoss(rrRatio, price);
+                }
+                
+            } catch (error) {
+                console.error('Erro ao buscar preço:', error);
+            }
+        }
+
+        // Definir Stop Loss baseado no Risk/Reward selecionado
+        function setStopLoss(rrRatio, entryPriceParam = null) {
+            const entryPrice = entryPriceParam !== null ? 
+                parseFloat(entryPriceParam) : 
+                parseFloat(document.getElementById('entryPrice').value);
+            
+            if (!entryPrice || entryPrice <= 0) {
+                showAlert('Por favor, insira ou selecione um preço de entrada válido.', 'warning');
+                return;
+            }
+
+            const operationType = document.getElementById('operationType').value;
+            const isLong = operationType.toLowerCase().includes('long') || operationType.toLowerCase().includes('compra');
+            
+            // Atualizar botões R:R
+            document.querySelectorAll('.rr-btn').forEach(btn => btn.classList.remove('active'));
+            if (event && event.target) {
+                event.target.classList.add('active');
+            } else {
+                // Se chamado programaticamente, encontrar o botão correto
+                const buttons = document.querySelectorAll('.rr-btn');
+                buttons.forEach(btn => {
+                    const ratioText = btn.textContent.split(':')[1];
+                    if (parseInt(ratioText) === rrRatio) {
+                        btn.classList.add('active');
+                    }
+                });
+            }
+
+            // Calcular Stop Loss baseado no R:R
+            // Para LONG: Stop Loss = Entry - (Entry / (RR + 1))
+            // Para SHORT: Stop Loss = Entry + (Entry / (RR + 1))
+            let stopLoss;
+            if (isLong) {
+                // Para LONG, o stop loss é abaixo do preço de entrada
+                // R:R 1:1 significa que o risco é igual ao reward
+                // Se queremos 1:3, o reward é 3x o risco
+                // Risk = Entry - StopLoss
+                // Reward = Target - Entry = 3 * Risk
+                // Para simplificar, vamos usar uma porcentagem fixa baseada no R:R
+                const riskPercent = 1 / (rrRatio + 1) * 100; // Ex: 1:3 = 25% de risco
+                stopLoss = entryPrice * (1 - riskPercent / 100);
+            } else {
+                // Para SHORT, o stop loss é acima do preço de entrada
+                const riskPercent = 1 / (rrRatio + 1) * 100;
+                stopLoss = entryPrice * (1 + riskPercent / 100);
+            }
+
+            document.getElementById('stopLoss').value = stopLoss.toFixed(2);
+        }
+
+        // Definir tipo de operação
+        function setOperationType(type) {
+            const btnLong = document.getElementById('btnLong');
+            const btnShort = document.getElementById('btnShort');
+            const operationTypeInput = document.getElementById('operationType');
+            
+            if (type === 'long') {
+                btnLong.classList.add('active');
+                btnShort.classList.remove('active');
+                operationTypeInput.value = 'LONG (Compra)';
+            } else {
+                btnShort.classList.add('active');
+                btnLong.classList.remove('active');
+                operationTypeInput.value = 'SHORT (Venda)';
+            }
+
+            // Recalcular stop loss se já houver preço de entrada
+            const entryPrice = parseFloat(document.getElementById('entryPrice').value);
+            if (entryPrice && entryPrice > 0) {
+                const activeRR = document.querySelector('.rr-btn.active');
+                if (activeRR) {
+                    const rrRatio = parseInt(activeRR.textContent.split(':')[1]);
+                    setStopLoss(rrRatio);
+                }
+            }
+        }
+
         function formatNumber(value) {
-            return new Intl.NumberFormat('pt-BR').format(value);
+            return new Intl.NumberFormat('en-US').format(value);
         }
 
         function showAlert(message, type = 'info') {
@@ -841,7 +1080,7 @@
                 data: {
                     labels: labels,
                     datasets: [{
-                        label: 'Capital Restante (R$)',
+                        label: 'Capital Restante (USD)',
                         data: data,
                         borderColor: '#e74c3c',
                         backgroundColor: gradient,
