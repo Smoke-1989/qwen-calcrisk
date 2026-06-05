@@ -1,5 +1,1 @@
-(calculadora_risco_posicao.html is a source file, so no need to add anything to .gitignore)
-
-```gitignore
-
-```
+Nothing should be ignored based on the provided file changes. The only modified file is `calculadora_risco_posicao.html`, which is a source code file and should not be ignored. There are no build artifacts, dependencies, or temporary files in the change list that require ignoring.
