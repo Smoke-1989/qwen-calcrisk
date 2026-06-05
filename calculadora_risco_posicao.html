@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calculadora de Risco e Tamanho de Posição</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        header {
+            background: linear-gradient(135deg, #2c3e50 0%, #3498db 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        header h1 {
+            font-size: 2em;
+            margin-bottom: 10px;
+        }
+
+        header p {
+            opacity: 0.9;
+            font-size: 1.1em;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            padding: 30px;
+        }
+
+        @media (max-width: 900px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .input-section, .results-section {
+            background: #f8f9fa;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .section-title {
+            color: #2c3e50;
+            font-size: 1.4em;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 3px solid #3498db;
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+        }
+
+        .input-group label {
+            display: block;
+            color: #34495e;
+            font-weight: 600;
+            margin-bottom: 8px;
+            font-size: 0.95em;
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1em;
+            transition: all 0.3s ease;
+        }
+
+        .input-group input:focus {
+            outline: none;
+            border-color: #3498db;
+            box-shadow: 0 0 10px rgba(52, 152, 219, 0.3);
+        }
+
+        .input-group .hint {
+            font-size: 0.85em;
+            color: #7f8c8d;
+            margin-top: 5px;
+        }
+
+        .btn-calculate {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            margin-top: 10px;
+        }
+
+        .btn-calculate:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(52, 152, 219, 0.4);
+        }
+
+        .result-card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+            border-left: 5px solid #3498db;
+        }
+
+        .result-card.success {
+            border-left-color: #27ae60;
+        }
+
+        .result-card.warning {
+            border-left-color: #f39c12;
+        }
+
+        .result-card.danger {
+            border-left-color: #e74c3c;
+        }
+
+        .result-label {
+            color: #7f8c8d;
+            font-size: 0.9em;
+            margin-bottom: 5px;
+        }
+
+        .result-value {
+            color: #2c3e50;
+            font-size: 1.8em;
+            font-weight: 700;
+        }
+
+        .result-value.positive {
+            color: #27ae60;
+        }
+
+        .result-value.negative {
+            color: #e74c3c;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        th, td {
+            padding: 15px;
+            text-align: left;
+            border-bottom: 1px solid #ecf0f1;
+        }
+
+        th {
+            background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+            color: white;
+            font-weight: 600;
+        }
+
+        tr:hover {
+            background: #f8f9fa;
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        .chart-container {
+            margin-top: 30px;
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .chart-title {
+            color: #2c3e50;
+            font-size: 1.3em;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        canvas {
+            max-width: 100%;
+            height: auto;
+        }
+
+        .scenario-selector {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .scenario-btn {
+            padding: 10px 20px;
+            border: 2px solid #3498db;
+            background: white;
+            color: #3498db;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .scenario-btn.active,
+        .scenario-btn:hover {
+            background: #3498db;
+            color: white;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .metric-box {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .metric-box .metric-value {
+            font-size: 2em;
+            font-weight: 700;
+            color: #3498db;
+        }
+
+        .metric-box .metric-label {
+            color: #7f8c8d;
+            font-size: 0.9em;
+            margin-top: 5px;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .alert {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+
+        .alert-info {
+            background: #d6eaf8;
+            color: #2980b9;
+            border: 1px solid #3498db;
+        }
+
+        .alert-warning {
+            background: #fdebd0;
+            color: #d68910;
+            border: 1px solid #f39c12;
+        }
+
+        .alert-danger {
+            background: #fadbd8;
+            color: #c0392b;
+            border: 1px solid #e74c3c;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📊 Calculadora de Risco e Tamanho de Posição</h1>
+            <p>Gerencie seu risco e otimize suas operações no mercado financeiro</p>
+        </header>
+
+        <div class="main-content">
+            <!-- Seção de Entrada -->
+            <div class="input-section">
+                <h2 class="section-title">⚙️ Parâmetros da Operação</h2>
+                
+                <div class="input-group">
+                    <label for="capital">Capital Total (R$)</label>
+                    <input type="number" id="capital" placeholder="Ex: 100000" step="0.01" min="0">
+                    <div class="hint">Valor total disponível para trading</div>
+                </div>
+
+                <div class="input-group">
+                    <label for="riskPercent">Risco Máximo por Trade (%)</label>
+                    <input type="number" id="riskPercent" placeholder="Ex: 2" step="0.1" min="0" max="100" value="2">
+                    <div class="hint">Percentual do capital que aceita perder por operação</div>
+                </div>
+
+                <div class="input-group">
+                    <label for="entryPrice">Preço de Entrada (R$)</label>
+                    <input type="number" id="entryPrice" placeholder="Ex: 50.00" step="0.01" min="0">
+                    <div class="hint">Preço médio de entrada na operação</div>
+                </div>
+
+                <div class="input-group">
+                    <label for="stopLoss">Preço do Stop Loss (R$)</label>
+                    <input type="number" id="stopLoss" placeholder="Ex: 47.50" step="0.01" min="0">
+                    <div class="hint">Preço onde a perda será realizada</div>
+                </div>
+
+                <div class="input-group">
+                    <label for="operationType">Tipo de Operação</label>
+                    <input type="text" id="operationType" placeholder="Ex: Compra (Long)" value="Compra (Long)">
+                </div>
+
+                <button class="btn-calculate" onclick="calculate()">🧮 Calcular Posição</button>
+
+                <div id="alerts" style="margin-top: 20px;"></div>
+            </div>
+
+            <!-- Seção de Resultados -->
+            <div class="results-section">
+                <h2 class="section-title">📈 Resultados da Análise</h2>
+
+                <div id="resultsContent" class="hidden">
+                    <div class="result-card success">
+                        <div class="result-label">Quantidade de Ações/Contratos</div>
+                        <div class="result-value" id="quantity">0</div>
+                    </div>
+
+                    <div class="result-card">
+                        <div class="result-label">Valor Investido Total</div>
+                        <div class="result-value" id="totalInvested">R$ 0,00</div>
+                    </div>
+
+                    <div class="result-card danger">
+                        <div class="result-label">Perda Máxima (Stop Loss)</div>
+                        <div class="result-value negative" id="maxLoss">R$ 0,00</div>
+                    </div>
+
+                    <div class="result-card warning">
+                        <div class="result-label">Risco por Ação/Contrato</div>
+                        <div class="result-value" id="riskPerShare">R$ 0,00</div>
+                    </div>
+
+                    <div class="result-card">
+                        <div class="result-label">% do Capital Utilizado</div>
+                        <div class="result-value" id="capitalUsed">0%</div>
+                    </div>
+
+                    <h3 style="color: #2c3e50; margin: 25px 0 15px 0;">📊 Tabela Risco-Retorno</h3>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Rácio</th>
+                                <th>Alvo (R$)</th>
+                                <th>Ganho Potencial</th>
+                                <th>Retorno sobre Risco</th>
+                            </tr>
+                        </thead>
+                        <tbody id="riskRewardTable">
+                        </tbody>
+                    </table>
+                </div>
+
+                <div id="noResults" style="text-align: center; padding: 40px; color: #7f8c8d;">
+                    <p style="font-size: 3em;">📝</p>
+                    <p>Preencha os parâmetros e clique em "Calcular Posição"</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Seção do Gráfico -->
+        <div style="padding: 0 30px 30px 30px;">
+            <div class="chart-container">
+                <h3 class="chart-title">📉 Projeção de Drawdown Acumulado</h3>
+                
+                <div class="scenario-selector">
+                    <button class="scenario-btn active" onclick="updateChart('conservative')">Conservador (5 erros)</button>
+                    <button class="scenario-btn" onclick="updateChart('moderate')">Moderado (10 erros)</button>
+                    <button class="scenario-btn" onclick="updateChart('aggressive')">Agressivo (20 erros)</button>
+                    <button class="scenario-btn" onclick="updateChart('extreme')">Extremo (30 erros)</button>
+                </div>
+
+                <canvas id="drawdownChart"></canvas>
+
+                <div class="metrics-grid" id="metricsGrid">
+                    <div class="metric-box">
+                        <div class="metric-value" id="metricCapitalRemaining">R$ 0</div>
+                        <div class="metric-label">Capital Restante</div>
+                    </div>
+                    <div class="metric-box">
+                        <div class="metric-value" id="metricTotalLoss">R$ 0</div>
+                        <div class="metric-label">Perda Total</div>
+                    </div>
+                    <div class="metric-box">
+                        <div class="metric-value" id="metricDrawdownPercent">0%</div>
+                        <div class="metric-label">Drawdown Máximo</div>
+                    </div>
+                    <div class="metric-box">
+                        <div class="metric-value" id="metricTradesToRecover">0</div>
+                        <div class="metric-label">Trades para Recuperar (1:2)</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        let drawdownChart = null;
+        let currentCapital = 100000;
+        let currentRiskPerTrade = 2000;
+
+        function formatCurrency(value) {
+            return new Intl.NumberFormat('pt-BR', {
+                style: 'currency',
+                currency: 'BRL'
+            }).format(value);
+        }
+
+        function formatNumber(value) {
+            return new Intl.NumberFormat('pt-BR').format(value);
+        }
+
+        function showAlert(message, type = 'info') {
+            const alertsDiv = document.getElementById('alerts');
+            alertsDiv.innerHTML = `<div class="alert alert-${type}">${message}</div>`;
+        }
+
+        function clearAlerts() {
+            document.getElementById('alerts').innerHTML = '';
+        }
+
+        function calculate() {
+            clearAlerts();
+
+            // Obter valores dos inputs
+            const capital = parseFloat(document.getElementById('capital').value);
+            const riskPercent = parseFloat(document.getElementById('riskPercent').value);
+            const entryPrice = parseFloat(document.getElementById('entryPrice').value);
+            const stopLoss = parseFloat(document.getElementById('stopLoss').value);
+            const operationType = document.getElementById('operationType').value;
+
+            // Validações
+            if (!capital || capital <= 0) {
+                showAlert('Por favor, insira um capital total válido.', 'danger');
+                return;
+            }
+
+            if (!riskPercent || riskPercent <= 0 || riskPercent > 100) {
+                showAlert('Por favor, insira um percentual de risco válido (0-100%).', 'danger');
+                return;
+            }
+
+            if (!entryPrice || entryPrice <= 0) {
+                showAlert('Por favor, insira um preço de entrada válido.', 'danger');
+                return;
+            }
+
+            if (!stopLoss || stopLoss <= 0) {
+                showAlert('Por favor, insira um preço de stop loss válido.', 'danger');
+                return;
+            }
+
+            // Determinar risco por ação baseado no tipo de operação
+            let riskPerShare;
+            if (operationType.toLowerCase().includes('compra') || operationType.toLowerCase().includes('long')) {
+                if (stopLoss >= entryPrice) {
+                    showAlert('Para operações de COMPRA, o Stop Loss deve ser MENOR que o preço de entrada.', 'warning');
+                    return;
+                }
+                riskPerShare = entryPrice - stopLoss;
+            } else {
+                if (stopLoss <= entryPrice) {
+                    showAlert('Para operações de VENDA, o Stop Loss deve ser MAIOR que o preço de entrada.', 'warning');
+                    return;
+                }
+                riskPerShare = stopLoss - entryPrice;
+            }
+
+            if (riskPerShare <= 0) {
+                showAlert('O risco por ação deve ser positivo.', 'danger');
+                return;
+            }
+
+            // Cálculos principais
+            const maxLossAmount = capital * (riskPercent / 100);
+            const quantity = Math.floor(maxLossAmount / riskPerShare);
+            const totalInvested = quantity * entryPrice;
+            const actualRisk = quantity * riskPerShare;
+            const capitalUsedPercent = (totalInvested / capital) * 100;
+
+            // Exibir resultados
+            document.getElementById('noResults').classList.add('hidden');
+            document.getElementById('resultsContent').classList.remove('hidden');
+
+            document.getElementById('quantity').textContent = formatNumber(quantity);
+            document.getElementById('totalInvested').textContent = formatCurrency(totalInvested);
+            document.getElementById('maxLoss').textContent = formatCurrency(actualRisk);
+            document.getElementById('riskPerShare').textContent = formatCurrency(riskPerShare);
+            document.getElementById('capitalUsed').textContent = capitalUsedPercent.toFixed(2) + '%';
+
+            // Gerar tabela risco-retorno
+            generateRiskRewardTable(entryPrice, riskPerShare, quantity, operationType);
+
+            // Atualizar variáveis globais para o gráfico
+            currentCapital = capital;
+            currentRiskPerTrade = actualRisk;
+
+            // Gerar gráfico inicial
+            updateChart('conservative');
+        }
+
+        function generateRiskRewardTable(entryPrice, riskPerShare, quantity, operationType) {
+            const tbody = document.getElementById('riskRewardTable');
+            tbody.innerHTML = '';
+
+            const ratios = [
+                { ratio: '1:1', multiplier: 1 },
+                { ratio: '1:2', multiplier: 2 },
+                { ratio: '1:3', multiplier: 3 },
+                { ratio: '1:4', multiplier: 4 },
+                { ratio: '1:5', multiplier: 5 }
+            ];
+
+            const isLong = operationType.toLowerCase().includes('compra') || operationType.toLowerCase().includes('long');
+
+            ratios.forEach(item => {
+                const profitPerShare = riskPerShare * item.multiplier;
+                const targetPrice = isLong ? entryPrice + profitPerShare : entryPrice - profitPerShare;
+                const totalProfit = profitPerShare * quantity;
+                const returnOnRisk = (totalProfit / (quantity * riskPerShare)) * 100;
+
+                const row = `
+                    <tr>
+                        <td><strong>${item.ratio}</strong></td>
+                        <td>${formatCurrency(targetPrice)}</td>
+                        <td style="color: #27ae60;"><strong>${formatCurrency(totalProfit)}</strong></td>
+                        <td>${returnOnRisk.toFixed(0)}%</td>
+                    </tr>
+                `;
+                tbody.innerHTML += row;
+            });
+        }
+
+        function updateChart(scenario) {
+            // Atualizar botões
+            document.querySelectorAll('.scenario-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+
+            let maxErrors;
+            switch(scenario) {
+                case 'conservative': maxErrors = 5; break;
+                case 'moderate': maxErrors = 10; break;
+                case 'aggressive': maxErrors = 20; break;
+                case 'extreme': maxErrors = 30; break;
+                default: maxErrors = 5;
+            }
+
+            // Gerar dados do drawdown
+            const labels = [];
+            const data = [];
+            let remainingCapital = currentCapital;
+            let totalLoss = 0;
+
+            labels.push('Inicial');
+            data.push(currentCapital);
+
+            for (let i = 1; i <= maxErrors; i++) {
+                remainingCapital -= currentRiskPerTrade;
+                totalLoss += currentRiskPerTrade;
+                labels.push(`${i}º Erro`);
+                data.push(Math.max(0, remainingCapital));
+            }
+
+            // Atualizar métricas
+            const drawdownPercent = ((currentCapital - remainingCapital) / currentCapital) * 100;
+            const tradesToRecover = currentRiskPerTrade > 0 ? Math.ceil(totalLoss / (currentRiskPerTrade * 2)) : 0;
+
+            document.getElementById('metricCapitalRemaining').textContent = formatCurrency(remainingCapital);
+            document.getElementById('metricTotalLoss').textContent = formatCurrency(totalLoss);
+            document.getElementById('metricDrawdownPercent').textContent = drawdownPercent.toFixed(2) + '%';
+            document.getElementById('metricTradesToRecover').textContent = formatNumber(tradesToRecover);
+
+            // Destacar métricas críticas
+            if (drawdownPercent > 20) {
+                document.getElementById('metricDrawdownPercent').style.color = '#e74c3c';
+            } else if (drawdownPercent > 10) {
+                document.getElementById('metricDrawdownPercent').style.color = '#f39c12';
+            } else {
+                document.getElementById('metricDrawdownPercent').style.color = '#3498db';
+            }
+
+            // Criar ou atualizar gráfico
+            const ctx = document.getElementById('drawdownChart').getContext('2d');
+
+            if (drawdownChart) {
+                drawdownChart.destroy();
+            }
+
+            // Criar gradiente
+            const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+            gradient.addColorStop(0, 'rgba(231, 76, 60, 0.8)');
+            gradient.addColorStop(1, 'rgba(231, 76, 60, 0.1)');
+
+            drawdownChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Capital Restante (R$)',
+                        data: data,
+                        borderColor: '#e74c3c',
+                        backgroundColor: gradient,
+                        borderWidth: 3,
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 5,
+                        pointHoverRadius: 8,
+                        pointBackgroundColor: '#e74c3c',
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top',
+                            labels: {
+                                font: {
+                                    size: 14,
+                                    family: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif"
+                                },
+                                usePointStyle: true
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            titleFont: {
+                                size: 14,
+                                family: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif"
+                            },
+                            bodyFont: {
+                                size: 13,
+                                family: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif"
+                            },
+                            padding: 12,
+                            cornerRadius: 8,
+                            callbacks: {
+                                label: function(context) {
+                                    return 'Capital: ' + formatCurrency(context.parsed.y);
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            ticks: {
+                                callback: function(value) {
+                                    return formatCurrency(value);
+                                },
+                                font: {
+                                    size: 12
+                                }
+                            },
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.1)'
+                            }
+                        },
+                        x: {
+                            ticks: {
+                                font: {
+                                    size: 11
+                                }
+                            },
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.1)'
+                            }
+                        }
+                    },
+                    interaction: {
+                        intersect: false,
+                        mode: 'index'
+                    }
+                }
+            });
+        }
+
+        // Adicionar evento de Enter nos inputs
+        document.querySelectorAll('input').forEach(input => {
+            input.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    calculate();
+                }
+            });
+        });
+
+        // Inicializar com valores de exemplo
+        window.onload = function() {
+            document.getElementById('capital').value = 100000;
+            document.getElementById('riskPercent').value = 2;
+            document.getElementById('entryPrice').value = 50.00;
+            document.getElementById('stopLoss').value = 47.50;
+        };
+    </script>
+</body>
+</html>
